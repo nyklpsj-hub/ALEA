@@ -158,11 +158,33 @@ ALEA_REQUIRE_DB=1 .venv/Scripts/python -m pytest -v
 `ALEA_REQUIRE_DB=1` 会让数据库不可达时**报错而不是跳过**——验收时应当这样跑，
 避免"因为环境没起来所以通过"。
 
-真实模型链路（会消耗 token）：
+### 真实模型链路
+
+自动化测试里的模型是脚本化的测试替身，覆盖的是控制流与护栏；**真实模型链路**
+需要配好密钥后单独验：
 
 ```bash
+# backend/.env 里填好 LLM_API_KEY / EMBEDDING_API_KEY，然后：
+cd backend
+.venv/Scripts/python -m scripts.smoke_llm           # 命令行跑完一段四轮困境
 ALEA_REQUIRE_DB=1 .venv/Scripts/python -m pytest -m llm -v
+.venv/Scripts/python -m scripts.ingest_knowledge    # 用真实向量模型重建索引
 ```
+
+`smoke_llm` 会逐轮打印：Agent 判断的贪婪/恐惧/约束、检索到的理论来源
+（含文件名、章节、相似度）、写入的长期记忆，以及最终结论的状态。
+它跑通即说明真实模型下主链路可用。
+
+### 已经验证过的部分（无需密钥）
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 全部后端测试 | `pytest -q` | 104 passed, 4 skipped（跳过的是 `-m llm`） |
+| 静态检查 | `ruff check app tests scripts` | All checks passed |
+| 类型检查 | `mypy app` | Success: no issues found in 51 source files |
+| 前端类型 + 构建 | `npm run typecheck && npm run build` | 构建成功 |
+| 服务真实启动 | `python -m scripts.serve` | `/api/health` 返回 200，checkpointer 就绪 |
+| 缺密钥时的行为 | 未配置 `LLM_API_KEY` 时发起对话 | 503 `configuration_error`，含可执行的修复提示 |
 
 ---
 

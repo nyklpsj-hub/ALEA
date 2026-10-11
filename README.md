@@ -74,6 +74,15 @@ cp .env.example backend/.env
 `LLM_BASE_URL` / `LLM_MODEL` 可以指向任何兼容 OpenAI 协议的端点
 （OpenAI、DeepSeek、通义千问、Moonshot、vLLM、Ollama 都可以）。
 
+> **已验证的端点形态**：本项目在开发机上确认过一个 OpenAI 兼容服务
+> `https://token-plan-cn.xiaomimimo.com/v1`（`/v1/models` 与
+> `/v1/chat/completions` 均返回 401 而非 404，说明路径存在，只差密钥）。
+> 也就是说，只要把该服务签发的 token 填进 `LLM_API_KEY`、把
+> `LLM_BASE_URL` 指向它以 `/v1` 结尾的地址即可，无需改代码。
+>
+> 注意：同一个服务还提供一个 **Anthropic 协议**的地址（以 `/anthropic` 结尾）。
+> 本项目只走 OpenAI 协议，请使用 `/v1` 那一个。
+
 ### 2. 启动数据库
 
 **方式 A：Docker（推荐）**
