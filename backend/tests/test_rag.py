@@ -61,9 +61,18 @@ def test_title_falls_back_to_the_first_heading(tmp_path: Path):
 def test_readme_and_underscore_files_are_not_indexed(tmp_path: Path):
     _write(tmp_path, "README.md", "# 说明\n")
     _write(tmp_path, "_draft.md", "---\ntitle: 草稿\n---\n\n草稿内容\n")
+    _write(tmp_path, "_templates/template.md", "---\ntitle: 模板\n---\n\n模板内容\n")
     _write(tmp_path, "real.md", "---\ntitle: 正式\n---\n\n正文\n")
     paths = [doc.source_path for doc in iter_documents(tmp_path)]
     assert paths == ["real.md"]
+
+
+def test_the_shipped_template_is_not_retrievable():
+    """The excerpt template declares `verified: true`; indexing it would let the
+    agent 'quote' a form."""
+    root = Path(__file__).resolve().parents[1] / "knowledge"
+    paths = [doc.source_path for doc in iter_documents(root)]
+    assert not any("template" in path for path in paths)
 
 
 def test_checksum_changes_only_when_content_changes(tmp_path: Path):

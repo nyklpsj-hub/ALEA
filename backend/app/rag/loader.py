@@ -102,10 +102,21 @@ def iter_documents(root: Path) -> list[KnowledgeDoc]:
         raise InvalidRequestError(f"知识库目录不存在：{root}")
     docs: list[KnowledgeDoc] = []
     for path in sorted(root.rglob("*.md")):
-        if path.name.lower().startswith("readme"):
-            continue
-        if path.name.lower().startswith("_"):
-            # Templates and drafts are kept out of the index on purpose.
+        if _is_draft_or_doc(path, root):
             continue
         docs.append(parse_document(path, root=root))
     return docs
+
+
+def _is_draft_or_doc(path: Path, root: Path) -> bool:
+    """Keep templates, drafts and the corpus README out of the index.
+
+    The convention is a leading underscore on the file *or any directory* on the
+    way to it, which is what keeps `_templates/verified-excerpt-template.md` — a
+    form that claims `verified: true` — from being retrieved as if it were a
+    quotation.
+    """
+    relative = path.relative_to(root)
+    if any(part.startswith(("_", ".")) for part in relative.parts):
+        return True
+    return path.name.lower().startswith("readme")

@@ -21,7 +21,8 @@
 如果你手上有《人选天选论》原文，请：
 
 1. 复制 `_templates/verified-excerpt-template.md`；
-2. 把 `_` 前缀去掉（下划线开头的文件不参与索引）；
+2. 把它放到**不以 `_` 开头的目录**里，并给一个正常的文件名
+   （文件名或路径中任何一层目录以 `_` 开头都不会被索引）；
 3. 填写 `source_type: verified_excerpt` 与 `verified: true`；
 4. 只粘贴**逐字核对过**的段落，并在 `locator` 里写明出处位置；
 5. 运行 `python -m scripts.ingest_knowledge`。
