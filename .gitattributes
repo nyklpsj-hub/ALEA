@@ -1,0 +1,11 @@
+# Normalise line endings so a Windows checkout behaves the same as CI and
+# Docker. Without this, shell scripts checked out with CRLF break the container
+# entry point (`/bin/sh^M: bad interpreter`).
+* text=auto eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
