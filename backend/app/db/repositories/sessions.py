@@ -53,11 +53,6 @@ async def list_sessions(
     return list((await session.execute(stmt)).scalars())
 
 
-async def count_sessions(session: AsyncSession, *, user_id: uuid.UUID) -> int:
-    stmt = select(func.count(Session.id)).where(Session.user_id == user_id, Session.deleted_at.is_(None))
-    return int((await session.execute(stmt)).scalar_one())
-
-
 async def next_seq(session: AsyncSession, *, session_id: uuid.UUID) -> int:
     stmt = select(func.coalesce(func.max(Message.seq), 0)).where(Message.session_id == session_id)
     return int((await session.execute(stmt)).scalar_one()) + 1
@@ -97,11 +92,6 @@ async def list_messages(
         .limit(limit)
     )
     return list((await session.execute(stmt)).scalars())
-
-
-async def message_by_id(session: AsyncSession, message_id: uuid.UUID, *, user_id: uuid.UUID) -> Message | None:
-    stmt = select(Message).where(Message.id == message_id, Message.user_id == user_id)
-    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def update_session_progress(

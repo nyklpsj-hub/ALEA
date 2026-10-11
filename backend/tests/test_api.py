@@ -192,9 +192,7 @@ async def test_a_missing_model_key_is_a_setup_error_not_a_crash(api, container):
     container.settings.llm_api_key = SecretStr("")
     try:
         session_id = await _create_session(api)
-        response = await api.post(
-            f"/api/sessions/{session_id}/messages", json={"content": "要不要辞职"}
-        )
+        response = await api.post(f"/api/sessions/{session_id}/messages", json={"content": "要不要辞职"})
     finally:
         container.settings.llm_api_key = original
 

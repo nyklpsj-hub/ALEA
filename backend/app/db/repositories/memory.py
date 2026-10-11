@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import MemoryKind, MemoryProvenance, MemoryStatus
@@ -301,20 +301,3 @@ async def list_decision_events(
 async def get_decision_event(session: AsyncSession, event_id: uuid.UUID, *, user_id: uuid.UUID) -> DecisionEvent | None:
     stmt = select(DecisionEvent).where(DecisionEvent.id == event_id, DecisionEvent.user_id == user_id)
     return (await session.execute(stmt)).scalar_one_or_none()
-
-
-async def search_text_memories(
-    session: AsyncSession, *, user_id: uuid.UUID, term: str, limit: int = 20
-) -> list[Memory]:
-    """Substring fallback used when embeddings are unavailable."""
-    pattern = f"%{term}%"
-    stmt = (
-        select(Memory)
-        .where(
-            Memory.user_id == user_id,
-            Memory.deleted_at.is_(None),
-            or_(Memory.content.ilike(pattern), Memory.normalized_key.ilike(pattern)),
-        )
-        .limit(limit)
-    )
-    return list((await session.execute(stmt)).scalars())
