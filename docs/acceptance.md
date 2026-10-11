@@ -179,7 +179,7 @@ ALEA_REQUIRE_DB=1 .venv/Scripts/python -m pytest -m llm -v
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
-| 全部后端测试 | `pytest -q` | 104 passed, 4 skipped（跳过的是 `-m llm`） |
+| 全部后端测试 | `pytest -q` | 107 passed, 4 skipped（跳过的是 `-m llm`） |
 | 静态检查 | `ruff check app tests scripts` | All checks passed |
 | 类型检查 | `mypy app` | Success: no issues found in 51 source files |
 | 前端类型 + 构建 | `npm run typecheck && npm run build` | 构建成功 |
