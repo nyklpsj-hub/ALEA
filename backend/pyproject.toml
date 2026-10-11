@@ -1,0 +1,70 @@
+[project]
+name = "alea-backend"
+version = "0.1.0"
+description = "Alea (人选祸) — an AI decision agent built on LangGraph"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "pgvector>=0.3.6",
+    "alembic>=1.14",
+    "greenlet>=3.1",
+    "langgraph>=1.0,<2",
+    "langgraph-checkpoint-postgres>=2.0",
+    "psycopg[binary,pool]>=3.2",
+    "langchain-core>=0.3",
+    "langchain-openai>=0.3",
+    "langchain-text-splitters>=0.3",
+    "openai>=1.54",
+    "httpx>=0.27",
+    "tenacity>=9.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+local-embeddings = ["fastembed>=0.4"]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pgserver>=0.1.4",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "llm: tests that require a real LLM endpoint",
+    "db: tests that require a real PostgreSQL instance",
+    "no_db: tests that must run without any database access",
+]
+
+[tool.ruff]
+# Chinese text counts as one character per glyph, so 100 columns is tight for
+# the prompts and fixtures in this project; 120 keeps lines readable without
+# forcing awkward wrapping of prose.
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
