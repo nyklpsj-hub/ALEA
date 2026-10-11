@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #0b0e13;
+  --color-ink-900: #11151c;
+  --color-ink-850: #161b24;
+  --color-ink-800: #1c222c;
+  --color-ink-700: #262d39;
+  --color-ink-600: #39424f;
+  --color-ink-400: #77808f;
+  --color-ink-300: #a7aeb9;
+  --color-ink-200: #cdd2da;
+  --color-ink-100: #e9ecf1;
+
+  --color-ember-500: #d97642;
+  --color-ember-400: #e08e5f;
+  --color-ember-600: #b65c2f;
+  --color-jade-500: #4f9d7f;
+  --color-jade-400: #6fb79a;
+  --color-amber-ink: #c9a227;
+
+  --font-sans: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", Georgia, serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-ink-950);
+  color: var(--color-ink-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-ember-500) 40%, transparent);
+}
+
+/* Thin, unobtrusive scrollbars for a reading-heavy interface. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-700) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-700);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes alea-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.alea-thinking-dot {
+  animation: alea-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes alea-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alea-fade-up {
+  animation: alea-fade-up 0.22s ease-out both;
+}
+
+/* Markdown body inside chat bubbles. Kept minimal on purpose. */
+.alea-prose {
+  line-height: 1.75;
+  font-size: 0.9375rem;
+  word-break: break-word;
+}
+.alea-prose > * + * {
+  margin-top: 0.7em;
+}
+.alea-prose h1,
+.alea-prose h2,
+.alea-prose h3 {
+  font-weight: 600;
+  line-height: 1.35;
+  margin-top: 1.1em;
+}
+.alea-prose h1 {
+  font-size: 1.15rem;
+}
+.alea-prose h2 {
+  font-size: 1.05rem;
+}
+.alea-prose h3 {
+  font-size: 1rem;
+  color: var(--color-ink-200);
+}
+.alea-prose ul,
+.alea-prose ol {
+  padding-left: 1.15rem;
+}
+.alea-prose ul {
+  list-style: disc;
+}
+.alea-prose ol {
+  list-style: decimal;
+}
+.alea-prose li + li {
+  margin-top: 0.25em;
+}
+.alea-prose strong {
+  color: var(--color-ink-100);
+  font-weight: 600;
+}
+.alea-prose em {
+  color: var(--color-ink-300);
+  font-style: normal;
+  font-size: 0.85em;
+}
+.alea-prose code {
+  background: var(--color-ink-800);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.alea-prose blockquote {
+  border-left: 2px solid var(--color-ember-600);
+  padding-left: 0.8rem;
+  color: var(--color-ink-300);
+}
+.alea-prose a {
+  color: var(--color-ember-400);
+  text-decoration: underline;
+}
+.alea-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.alea-prose th,
+.alea-prose td {
+  border: 1px solid var(--color-ink-700);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
