@@ -206,7 +206,7 @@ async def understand(state: AleaState) -> dict[str, Any]:
     turns = _transcript(state.get("messages", []))
     latest = state.get("latest_user_text", "")
 
-    model = llm.get_chat_model(temperature=0.0, max_tokens=2600)
+    model = llm.get_chat_model(temperature=0.0)
     result = await llm.call_structured(
         model,
         Understanding,
@@ -562,7 +562,7 @@ async def knowledge(state: AleaState) -> dict[str, Any]:
             user_id=deps.user_id,
             trace=trace,
         )
-        model = llm.get_chat_model(temperature=0.0, max_tokens=1500)
+        model = llm.get_chat_model(temperature=0.0)
         bound = model.bind_tools(tools)
         by_name = {tool.name: tool for tool in tools}
 
@@ -737,7 +737,7 @@ async def decide(state: AleaState) -> dict[str, Any]:
         or "（本轮没有检索到可引用的来源）"
     )
 
-    model = llm.get_chat_model(temperature=0.3, max_tokens=3000)
+    model = llm.get_chat_model(temperature=0.3)
     decision = await llm.call_structured(
         model,
         Decision,

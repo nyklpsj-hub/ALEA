@@ -169,7 +169,7 @@ class MemoryService:
     ) -> DecisionEvent | None:
         if decision.status == "hold_safety":
             return None
-        model = llm.get_chat_model(temperature=0.2, max_tokens=900)
+        model = llm.get_chat_model(temperature=0.2)
         transcript = "\n".join(
             f"{'用户' if role == 'user' else 'Agent'}：{content.strip()}" for role, content in turns[-20:]
         )

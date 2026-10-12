@@ -70,7 +70,7 @@ async def extract_candidates(
     if len(latest_user_text.strip()) < settings.memory_min_message_chars:
         return []
 
-    model = llm.get_chat_model(temperature=0.0, max_tokens=1200)
+    model = llm.get_chat_model(temperature=0.0)
     prompt = EXTRACTION_USER.format(
         dilemma=analysis.dilemma.statement or "（尚未明确）",
         analysis_summary=_render_analysis(analysis),

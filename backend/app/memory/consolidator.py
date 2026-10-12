@@ -153,7 +153,7 @@ async def _judge_neighbours(
         f"{index}. {item.content}（录入于 {item.created_at:%Y-%m-%d}，状态 {item.status}）"
         for index, item in enumerate(neighbours)
     )
-    model = llm.get_chat_model(temperature=0.0, max_tokens=600)
+    model = llm.get_chat_model(temperature=0.0)
     try:
         resolution = await llm.call_structured(
             model,

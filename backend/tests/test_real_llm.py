@@ -19,7 +19,9 @@ pytestmark = [pytest.mark.llm, pytest.mark.db]
 async def test_the_configured_model_returns_structured_output(real_llm):
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    model = get_chat_model(temperature=0.0, max_tokens=1200)
+    # This provider's model emits reasoning tokens, billed against the same
+    # budget as the answer; a small cap starves the tool call entirely.
+    model = get_chat_model(temperature=0.0)
     result = await call_structured(
         model,
         Understanding,
@@ -68,7 +70,7 @@ async def test_a_real_conversation_turn_produces_a_usable_reply(container, real_
         events.append(event)
 
     done = next(event for event in events if event["type"] == "done")
-    reply = done["message"]["content"]
+    reply = done["message"].content
     assert len(reply) > 30
     assert any("一" <= char <= "鿿" for char in reply), "回复应当是中文"
     assert done["analysis"]["dilemma"]["statement"]

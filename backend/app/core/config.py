@@ -57,15 +57,25 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
     llm_model: str = "gpt-4o-mini"
     llm_temperature: float = 0.5
-    llm_max_tokens: int = 2000
+    #: One budget for every model call, structured ones included. Reasoning
+    #: models count their thinking against it, so a value tuned for a
+    #: non-reasoning model will truncate the answer — the symptom is a
+    #: structured call that returns nothing at all.
+    llm_max_tokens: int = 4000
     llm_timeout_seconds: float = 90.0
     llm_max_retries: int = 2
     #: How structured output is requested. `function_calling` is what hosted
     #: providers (OpenAI, DeepSeek, Qwen, …) handle best; `json_mode` is the
     #: fallback for local and self-hosted models that do not implement tools.
     llm_structured_output_method: Literal["function_calling", "json_mode", "json_schema"] = "function_calling"
+    #: Passed to the provider for structured calls. "required" is the honest
+    #: default: every structured call here *must* return an object, so leaving
+    #: the model free to answer in prose only creates intermittency — with a
+    #: longer prompt, weaker models do exactly that. Set to "" to let the model
+    #: choose, or to a function name for providers that require one.
+    llm_tool_choice: str = "required"
     #: Hard ceiling for a single graph run, guards against a hung provider.
-    agent_run_timeout_seconds: float = 300.0
+    agent_run_timeout_seconds: float = 600.0
 
     # ------------------------------------------------------- llm (embedding)
     embedding_provider: Literal["openai", "local"] = "openai"

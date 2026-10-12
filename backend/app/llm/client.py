@@ -218,7 +218,10 @@ async def call_structured[SchemaT: BaseModel](
     settings = get_settings()
     method = settings.llm_structured_output_method
     attempts = (max_retries if max_retries is not None else settings.llm_max_retries) + 1
-    runnable = model.with_structured_output(schema, method=method, include_raw=False)
+    options: dict[str, Any] = {}
+    if method == "function_calling" and settings.llm_tool_choice:
+        options["tool_choice"] = settings.llm_tool_choice
+    runnable = model.with_structured_output(schema, method=method, include_raw=False, **options)
     base_messages = list(messages)
     if method == "json_mode":
         base_messages = [*base_messages, HumanMessage(content=_json_schema_hint(schema))]

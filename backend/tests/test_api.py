@@ -207,7 +207,7 @@ async def test_memory_crud_and_history(api, patch_llm):
     install = patch_llm([[]])
     from tests.fakes import one_hot
 
-    install.embedder.default_vector = one_hot(1536, 91)
+    install.embedder.default_vector = one_hot(install.embedder.dim, 91)
 
     created = await api.post(
         "/api/memories",
@@ -242,7 +242,7 @@ async def test_memory_search_returns_scores(api, patch_llm):
     install = patch_llm([[]])
     from tests.fakes import one_hot
 
-    install.embedder.default_vector = one_hot(1536, 92)
+    install.embedder.default_vector = one_hot(install.embedder.dim, 92)
     await api.post("/api/memories", json={"kind": "fear", "content": "你害怕失去稳定的收入"})
 
     response = await api.post("/api/memories/search", json={"query": "收入"})
@@ -256,7 +256,7 @@ async def test_memories_cannot_be_read_across_users(api, container, patch_llm):
     install = patch_llm([[]])
     from tests.fakes import one_hot
 
-    install.embedder.default_vector = one_hot(1536, 93)
+    install.embedder.default_vector = one_hot(install.embedder.dim, 93)
     created = await api.post("/api/memories", json={"kind": "goal", "content": "你想换一条职业路径"})
     memory_id = created.json()["id"]
 

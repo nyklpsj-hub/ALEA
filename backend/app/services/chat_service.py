@@ -8,6 +8,7 @@ snapshot (analysis, decision, title) back to the session row.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
@@ -203,28 +204,51 @@ class ChatService:
         final_state: dict[str, Any] = {}
 
         try:
-            async for chunk in graph.astream(state_seed, config, stream_mode=_TURN_STREAM_MODES):
-                mode, payload = _split_stream_chunk(chunk)
-                if mode == "messages":
-                    message_chunk, metadata = payload
-                    node = (metadata or {}).get("langgraph_node")
-                    if node not in REPLY_NODES:
-                        continue
-                    text = _chunk_text(message_chunk)
-                    if text:
-                        yield {"type": "token", "node": node, "text": text}
-                elif mode == "updates":
-                    for node, update in (payload or {}).items():
-                        if not isinstance(update, dict):
+            # One budget for the whole turn: several model calls happen inside it,
+            # and without this a stuck provider would hold the stream open forever.
+            async with asyncio.timeout(self.settings.agent_run_timeout_seconds):
+                async for chunk in graph.astream(
+                    state_seed, config, stream_mode=_TURN_STREAM_MODES
+                ):
+                    mode, payload = _split_stream_chunk(chunk)
+                    if mode == "messages":
+                        message_chunk, metadata = payload
+                        node = (metadata or {}).get("langgraph_node")
+                        if node not in REPLY_NODES:
                             continue
-                        final_state.update(update)
-                        if node not in seen_nodes:
-                            seen_nodes.add(node)
-                            yield {
-                                "type": "node",
-                                "node": node,
-                                "phase": _phase_of(update) or None,
-                            }
+                        text = _chunk_text(message_chunk)
+                        if text:
+                            yield {"type": "token", "node": node, "text": text}
+                    elif mode == "updates":
+                        for node, update in (payload or {}).items():
+                            if not isinstance(update, dict):
+                                continue
+                            final_state.update(update)
+                            if node not in seen_nodes:
+                                seen_nodes.add(node)
+                                yield {
+                                    "type": "node",
+                                    "node": node,
+                                    "phase": _phase_of(update) or None,
+                                }
+        except TimeoutError:
+            logger.warning(
+                "agent_run_timeout",
+                extra={
+                    "session_id": str(session_id),
+                    "budget_seconds": self.settings.agent_run_timeout_seconds,
+                    "nodes_done": sorted(seen_nodes),
+                },
+            )
+            yield {
+                "type": "error",
+                "message": (
+                    f"本轮处理超过了 {self.settings.agent_run_timeout_seconds:.0f} 秒的时间预算，已中止。"
+                    "可以重试，或调大 LLM_TIMEOUT_SECONDS / AGENT_RUN_TIMEOUT_SECONDS。"
+                ),
+                "code": "agent_timeout",
+            }
+            return
         except AppError as exc:
             logger.warning(
                 "agent_run_failed",

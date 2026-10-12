@@ -20,7 +20,6 @@ from .fakes import one_hot
 
 pytestmark = pytest.mark.db
 
-DIM = 1536
 
 
 def understanding(**overrides) -> dict:
@@ -605,7 +604,7 @@ async def test_session_state_survives_a_restart(container, user_id, patch_llm, s
 async def test_a_confirmed_memory_is_recalled_in_a_later_session(container, user_id, patch_llm):
     """Acceptance item: closing a session and starting a new one still uses memory."""
     install = patch_llm([[]])
-    install.embedder.default_vector = one_hot(DIM, 42)
+    install.embedder.default_vector = one_hot(install.embedder.dim, 42)
 
     claim = confirmation("q-mem", "constraint", "你的硬约束是每月房贷 8000 元不能断", "房贷 8000 一个月")
     first_session = await _new_session(container, user_id)
@@ -619,7 +618,7 @@ async def test_a_confirmed_memory_is_recalled_in_a_later_session(container, user
     await _run(container, first_session, user_id, "房贷 8000 一个月")
 
     resolver = patch_llm([[]])
-    resolver.embedder.default_vector = one_hot(DIM, 42)
+    resolver.embedder.default_vector = one_hot(resolver.embedder.dim, 42)
     await container.chat_service.resolve_confirmation(
         user_id=user_id, session_id=first_session, confirmation_id="q-mem", action="confirm"
     )
@@ -632,7 +631,7 @@ async def test_a_confirmed_memory_is_recalled_in_a_later_session(container, user
             [{"memories": []}],
         ]
     )
-    second.embedder.default_vector = one_hot(DIM, 42)
+    second.embedder.default_vector = one_hot(second.embedder.dim, 42)
     second_session = await _new_session(container, user_id)
     _, done = await _run(container, second_session, user_id, "我又在纠结要不要换工作")
 
@@ -645,7 +644,7 @@ async def test_a_confirmed_memory_is_recalled_in_a_later_session(container, user
 
 async def test_recalled_memory_is_labelled_with_its_provenance(container, user_id, patch_llm):
     install = patch_llm([[]])
-    install.embedder.default_vector = one_hot(DIM, 43)
+    install.embedder.default_vector = one_hot(install.embedder.dim, 43)
 
     from app.db.repositories import memory as memory_repo
     from app.memory.service import MemoryService
@@ -658,7 +657,7 @@ async def test_recalled_memory_is_labelled_with_its_provenance(container, user_i
             content="你害怕失去稳定的收入",
             provenance=MemoryProvenance.USER_STATED,
             status=MemoryStatus.ACTIVE,
-            embedding=one_hot(DIM, 43),
+            embedding=one_hot(install.embedder.dim, 43),
         )
         await memory_repo.create_memory(
             session,
@@ -667,7 +666,7 @@ async def test_recalled_memory_is_labelled_with_its_provenance(container, user_i
             content="你可能更在意别人怎么看你，而不是收入",
             provenance=MemoryProvenance.AGENT_INFERRED,
             status=MemoryStatus.CANDIDATE,
-            embedding=one_hot(DIM, 43),
+            embedding=one_hot(install.embedder.dim, 43),
         )
 
     service = MemoryService(container.settings)

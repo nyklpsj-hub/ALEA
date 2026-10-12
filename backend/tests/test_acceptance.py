@@ -19,7 +19,6 @@ from .test_agent_flow import DECISION, DECISION_EVENT, confirmation, motive, und
 
 pytestmark = pytest.mark.db
 
-DIM = 1536
 
 
 async def _create_session(api) -> str:
@@ -321,7 +320,7 @@ async def test_criterion_4_high_risk_stops_the_advice_entirely(api, patch_llm):
 # ==========================================================================
 async def test_criterion_5_memory_travels_across_sessions_and_is_editable(api, container, patch_llm):
     install = patch_llm([[]])
-    install.embedder.default_vector = one_hot(DIM, 77)
+    install.embedder.default_vector = one_hot(install.embedder.dim, 77)
 
     # --- session A: confirm an important constraint -----------------------
     session_a = await _create_session(api)
@@ -347,7 +346,7 @@ async def test_criterion_5_memory_travels_across_sessions_and_is_editable(api, c
     await _turn(api, session_a, "房贷 8000 一个月")
 
     resolver = patch_llm([[]])
-    resolver.embedder.default_vector = one_hot(DIM, 77)
+    resolver.embedder.default_vector = one_hot(resolver.embedder.dim, 77)
     resolved = await api.post(
         f"/api/sessions/{session_a}/confirmations/q-loan",
         json={"confirmation_id": "q-loan", "action": "confirm"},
@@ -363,7 +362,7 @@ async def test_criterion_5_memory_travels_across_sessions_and_is_editable(api, c
             [{"memories": []}],
         ]
     )
-    second.embedder.default_vector = one_hot(DIM, 77)
+    second.embedder.default_vector = one_hot(second.embedder.dim, 77)
     session_b = await _create_session(api)
     done = await _turn(api, session_b, "我又在纠结要不要换工作")
 
@@ -390,7 +389,7 @@ async def test_criterion_5_memory_travels_across_sessions_and_is_editable(api, c
 
     # --- a third session sees the edited version --------------------------
     third = patch_llm([[understanding(sufficiency=0.3)], ["房贷现在是 8500 了？"], [{"memories": []}]])
-    third.embedder.default_vector = one_hot(DIM, 77)
+    third.embedder.default_vector = one_hot(third.embedder.dim, 77)
     session_c = await _create_session(api)
     done2 = await _turn(api, session_c, "我又在纠结要不要换工作")
     assert "8500" in done2["analysis"]["recalled_memories"][0]["content"]
@@ -398,7 +397,7 @@ async def test_criterion_5_memory_travels_across_sessions_and_is_editable(api, c
     # --- deleting removes it from retrieval -------------------------------
     assert (await api.delete(f"/api/memories/{memory_id}")).status_code == 204
     fourth = patch_llm([[understanding(sufficiency=0.3)], ["继续说说？"], [{"memories": []}]])
-    fourth.embedder.default_vector = one_hot(DIM, 77)
+    fourth.embedder.default_vector = one_hot(fourth.embedder.dim, 77)
     session_d = await _create_session(api)
     done3 = await _turn(api, session_d, "我又在纠结要不要换工作")
     assert all("房贷" not in ref["content"] for ref in done3["analysis"]["recalled_memories"])

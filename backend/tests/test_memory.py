@@ -17,8 +17,6 @@ from .fakes import blend, one_hot
 
 pytestmark = pytest.mark.db
 
-DIM = 1536
-
 
 def candidate(
     content: str,
@@ -98,8 +96,8 @@ async def test_write_is_recorded_in_the_audit_trail(settings, database, user_id,
 # ------------------------------------------------------------ de-duplication
 async def test_same_memory_again_is_merged_not_duplicated(settings, database, user_id, patch_llm):
     install = patch_llm([[], []])
-    install.embedder.set_vector("你害怕失去稳定的收入", one_hot(DIM, 1))
-    install.embedder.set_vector("你担心辞职之后就没有稳定收入了", one_hot(DIM, 1))
+    install.embedder.set_vector("你害怕失去稳定的收入", one_hot(install.embedder.dim, 1))
+    install.embedder.set_vector("你担心辞职之后就没有稳定收入了", one_hot(install.embedder.dim, 1))
 
     await _persist(database, settings, user_id, [candidate("你害怕失去稳定的收入")])
     outcomes = await _persist(database, settings, user_id, [candidate("你担心辞职之后就没有稳定收入了")])
@@ -116,8 +114,8 @@ async def test_same_memory_again_is_merged_not_duplicated(settings, database, us
 
 async def test_confirmation_upgrades_an_inferred_memory(settings, database, user_id, patch_llm):
     install = patch_llm([[], []])
-    install.embedder.set_vector("你最怕的是失去可回退的路径", one_hot(DIM, 2))
-    install.embedder.set_vector("你最怕的是失去可以回头的路", one_hot(DIM, 2))
+    install.embedder.set_vector("你最怕的是失去可回退的路径", one_hot(install.embedder.dim, 2))
+    install.embedder.set_vector("你最怕的是失去可以回头的路", one_hot(install.embedder.dim, 2))
 
     await _persist(database, settings, user_id, [candidate("你最怕的是失去可回退的路径")])
     outcomes = await _persist(
@@ -143,9 +141,9 @@ async def test_contradiction_supersedes_the_old_memory(settings, database, user_
     install = patch_llm([[{"verdicts": [{"index": 0, "verdict": "contradict", "note": "用户改变了决定"}]}]])
     old_text = "你倾向于留在现在的城市"
     new_text = "你已经决定搬去合伙人的城市"
-    install.embedder.set_vector(old_text, one_hot(DIM, 3))
+    install.embedder.set_vector(old_text, one_hot(install.embedder.dim, 3))
     # cosine ≈ 0.80: similar enough to ask, below the merge threshold.
-    install.embedder.set_vector(new_text, blend(DIM, 3, 4, 0.8))
+    install.embedder.set_vector(new_text, blend(install.embedder.dim, 3, 4, 0.8))
 
     await _persist(database, settings, user_id, [candidate(old_text)])
     outcomes = await _persist(database, settings, user_id, [candidate(new_text, kind=MemoryKind.FEAR)])
@@ -164,8 +162,8 @@ async def test_unrelated_neighbours_are_kept_side_by_side(settings, database, us
     install = patch_llm([[]])
     first = "你害怕失去稳定的收入"
     second = "你希望在四十岁前换一条职业路径"
-    install.embedder.set_vector(first, one_hot(DIM, 5))
-    install.embedder.set_vector(second, blend(DIM, 5, 6, 0.8))
+    install.embedder.set_vector(first, one_hot(install.embedder.dim, 5))
+    install.embedder.set_vector(second, blend(install.embedder.dim, 5, 6, 0.8))
 
     await _persist(database, settings, user_id, [candidate(first)])
     await _persist(database, settings, user_id, [candidate(second, kind=MemoryKind.GOAL)])
@@ -180,8 +178,8 @@ async def test_retrieval_is_relevance_based(settings, database, user_id, patch_l
     install = patch_llm([[], []])
     relevant = "你怕的是三十五岁之后再也没人愿意给你机会"
     unrelated = "你喜欢在周末做木工"
-    install.embedder.set_vector(relevant, one_hot(DIM, 7))
-    install.embedder.set_vector(unrelated, one_hot(DIM, 8))
+    install.embedder.set_vector(relevant, one_hot(install.embedder.dim, 7))
+    install.embedder.set_vector(unrelated, one_hot(install.embedder.dim, 8))
 
     await _persist(
         database,
@@ -193,7 +191,7 @@ async def test_retrieval_is_relevance_based(settings, database, user_id, patch_l
         ],
     )
 
-    install.embedder.set_vector("我在纠结要不要换工作，怕年龄是问题", one_hot(DIM, 7))
+    install.embedder.set_vector("我在纠结要不要换工作，怕年龄是问题", one_hot(install.embedder.dim, 7))
     service = MemoryService(settings)
     async with database.session() as session:
         result = await service.recall(session, user_id=user_id, query="我在纠结要不要换工作，怕年龄是问题")
@@ -204,7 +202,7 @@ async def test_retrieval_is_relevance_based(settings, database, user_id, patch_l
 async def test_recall_marks_memories_as_used(settings, database, user_id, patch_llm):
     install = patch_llm([[]])
     text = "你害怕被同行超越"
-    install.embedder.set_vector(text, one_hot(DIM, 9))
+    install.embedder.set_vector(text, one_hot(install.embedder.dim, 9))
     await _persist(database, settings, user_id, [candidate(text)])
 
     service = MemoryService(settings)
@@ -219,7 +217,7 @@ async def test_recall_marks_memories_as_used(settings, database, user_id, patch_
 async def test_memories_are_isolated_per_user(settings, database, user_id, patch_llm):
     install = patch_llm([[]])
     text = "你害怕失去稳定的收入"
-    install.embedder.set_vector(text, one_hot(DIM, 10))
+    install.embedder.set_vector(text, one_hot(install.embedder.dim, 10))
     await _persist(database, settings, user_id, [candidate(text)])
 
     other_user = uuid.uuid4()
@@ -235,7 +233,7 @@ async def test_memories_are_isolated_per_user(settings, database, user_id, patch
 async def test_deleted_memories_are_not_recalled(settings, database, user_id, patch_llm):
     install = patch_llm([[]])
     text = "你害怕失去稳定的收入"
-    install.embedder.set_vector(text, one_hot(DIM, 11))
+    install.embedder.set_vector(text, one_hot(install.embedder.dim, 11))
     outcomes = await _persist(database, settings, user_id, [candidate(text)])
 
     from datetime import UTC, datetime
