@@ -392,6 +392,26 @@ async def test_sufficient_information_produces_a_grounded_recommendation(contain
     assert detail.decision is not None
 
 
+async def test_retrieval_still_happens_when_the_model_cannot_call_tools(container, knowledge, user_id, patch_llm):
+    """Local/self-hosted models often have no tool calling; grounding must survive."""
+    patch_llm(
+        [
+            [understanding(sufficiency=0.85)],
+            # First response carries no tool calls at all.
+            ["我直接回答，不检索。", "要点 —— 来源 1"],
+            [DECISION],
+            [{"memories": []}],
+            [DECISION_EVENT],
+        ]
+    )
+    session_id = await _new_session(container, user_id)
+    _, done = await _run(container, session_id, user_id, "房贷不能断，但我想全职做摄影")
+
+    assert done["citations"], "模型未调用工具时也必须退回到一次确定性检索"
+    assert all(citation["source_path"].endswith(".md") for citation in done["citations"])
+    assert done["decision"]["citations"]
+
+
 async def test_decision_event_is_recorded_after_a_recommendation(container, knowledge, user_id, patch_llm):
     from app.db.models import DecisionEvent
 

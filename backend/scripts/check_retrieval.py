@@ -54,8 +54,10 @@ async def run(queries: list[str], *, top_k: int, reindex: bool) -> int:
         documents = await service.list_documents()
         print(f"知识库共 {len(documents)} 个文档：")
         for document, chunk_count in documents:
-            tag = "原文摘录" if document.source_type == "verified_excerpt" else (
-                "案例" if document.source_type == "case" else "整理笔记"
+            tag = (
+                "原文摘录"
+                if document.source_type == "verified_excerpt"
+                else ("案例" if document.source_type == "case" else "整理笔记")
             )
             print(f"  · {document.title}（{tag}，{chunk_count} 切片）  {document.source_path}")
         print()

@@ -8,11 +8,12 @@ changing three environment variables.
 from __future__ import annotations
 
 import asyncio
+import json
 from functools import lru_cache
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pydantic import BaseModel, SecretStr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
@@ -176,6 +177,27 @@ async def embed_query(text: str) -> list[float]:
         raise EmbeddingError(f"查询向量化失败：{type(exc).__name__}") from exc
 
 
+def _json_schema_hint(schema: type[BaseModel]) -> str:
+    """Describe the required object for providers that only support JSON mode.
+
+    With ``method="json_mode"`` the provider guarantees a JSON object but not its
+    shape, so the schema has to travel in the prompt.
+    """
+    return "只输出一个 JSON 对象，不要解释、不要 Markdown 代码块。它必须符合下面的 JSON Schema：\n" + json.dumps(
+        schema.model_json_schema(), ensure_ascii=False
+    )
+
+
+def _why(exc: Exception) -> str:
+    """A short, log-safe reason.
+
+    Only the validation *shape* is kept (field names and allowed values), never
+    the payload it came from — that payload is derived from the conversation.
+    """
+    text = " ".join(str(exc).split())
+    return text[:240]
+
+
 async def call_structured[SchemaT: BaseModel](
     model: BaseChatModel,
     schema: type[SchemaT],
@@ -186,16 +208,27 @@ async def call_structured[SchemaT: BaseModel](
 ) -> SchemaT:
     """Ask the model for a structured object matching ``schema``.
 
-    Raises ``LLMUnavailableError`` when the provider cannot produce a valid
-    object, which the graph turns into a graceful degradation instead of a 500.
+    A rejected object is retried *with the validation error fed back*, which
+    turns a hard failure into a correction for the common case of one wrong enum
+    or a missing field — a whole turn is too much to lose over that.
+
+    Raises ``LLMUnavailableError`` when the provider still cannot comply, which
+    the graph turns into a graceful degradation instead of a 500.
     """
     settings = get_settings()
+    method = settings.llm_structured_output_method
     attempts = (max_retries if max_retries is not None else settings.llm_max_retries) + 1
-    runnable = model.with_structured_output(schema, method="function_calling")
+    runnable = model.with_structured_output(schema, method=method, include_raw=False)
+    base_messages = list(messages)
+    if method == "json_mode":
+        base_messages = [*base_messages, HumanMessage(content=_json_schema_hint(schema))]
+
     last_error: Exception | None = None
+    repair: HumanMessage | None = None
     for attempt in range(1, attempts + 1):
+        attempt_messages = [*base_messages, repair] if repair else base_messages
         try:
-            result = await runnable.ainvoke(messages)
+            result = await runnable.ainvoke(attempt_messages)
             if isinstance(result, schema):
                 return result
             if isinstance(result, dict):
@@ -203,7 +236,18 @@ async def call_structured[SchemaT: BaseModel](
             raise LLMResponseError("模型未返回结构化结果")
         except (LLMResponseError, ValueError) as exc:
             last_error = exc
-            logger.warning("structured_output_invalid", extra={"node": node, "attempt": attempt})
+            problem = _why(exc)
+            logger.warning(
+                "structured_output_invalid",
+                extra={"node": node, "attempt": attempt, "why": problem},
+            )
+            repair = HumanMessage(
+                content=(
+                    "上一次的输出不符合要求，无法解析：\n"
+                    f"{problem}\n"
+                    "请修正后重新输出，只输出一个符合 schema 的 JSON 对象，不要解释。"
+                )
+            )
         except _TRANSIENT as exc:
             last_error = exc
             logger.warning("structured_output_timeout", extra={"node": node, "attempt": attempt})

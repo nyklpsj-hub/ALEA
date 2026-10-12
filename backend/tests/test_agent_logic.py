@@ -151,6 +151,22 @@ def test_risk_flags_from_the_model_and_the_keyword_backstop_are_merged():
     assert set(update["risk_flags"]) == {"用户提到过被胁迫", "自伤/自杀倾向"}
 
 
+def test_a_fear_written_into_the_greeds_list_is_filed_as_a_fear():
+    """Weaker models do put a fear in `greeds`; the explicit `kind` label wins.
+
+    Filing by list membership instead would silently turn a fear into a want,
+    which then feeds the wrong motive into the recommendation.
+    """
+    wanted = Motive(kind="greed", statement="你想被认可为专业人士", evidence="我想被认可")
+    misplaced = Motive(kind="fear", statement="你害怕失去稳定的收入", evidence="我怕没工资")
+    result = Understanding(greeds=[wanted, misplaced])
+    update = _reconcile(_state(), result)
+
+    assert [m.statement for m in update["greeds"]] == ["你想被认可为专业人士"]
+    assert [m.statement for m in update["fears"]] == ["你害怕失去稳定的收入"]
+    assert [m.kind for m in update["fears"]] == ["fear"]
+
+
 def test_constraints_get_stable_ids():
     result = Understanding(constraints=[Constraint(statement="房贷不能断")])
     update = _reconcile(_state(), result)

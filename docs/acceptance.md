@@ -167,6 +167,7 @@ ALEA_REQUIRE_DB=1 .venv/Scripts/python -m pytest -v
 # backend/.env 里填好 LLM_API_KEY / EMBEDDING_API_KEY，然后：
 cd backend
 .venv/Scripts/python -m scripts.smoke_llm           # 命令行跑完一段四轮困境
+.venv/Scripts/python -m scripts.check_retrieval     # 只验检索，不需要聊天模型
 ALEA_REQUIRE_DB=1 .venv/Scripts/python -m pytest -m llm -v
 .venv/Scripts/python -m scripts.ingest_knowledge    # 用真实向量模型重建索引
 ```
@@ -175,16 +176,60 @@ ALEA_REQUIRE_DB=1 .venv/Scripts/python -m pytest -m llm -v
 （含文件名、章节、相似度）、写入的长期记忆，以及最终结论的状态。
 它跑通即说明真实模型下主链路可用。
 
+### 已跑通的真实模型链路（无需任何外部密钥）
+
+在没有外部 API Key 的机器上，用**本地模型**把真实链路完整跑过一遍：
+
+```bash
+# 1) 本地 OpenAI 兼容服务（llama.cpp，CPU 即可）
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+pip install sse-starlette starlette-context      # llama-cpp 服务的可选依赖
+python -m llama_cpp.server --model <Qwen2.5-3B-Instruct-Q4_K_M.gguf> \
+    --host 127.0.0.1 --port 8080 --chat_format chatml --n_ctx 16384
+
+# 2) 离线向量模型（ONNX，无需编译）
+pip install "fastembed>=0.4"
+
+# 3) 512 维的库（本地向量模型是 512 维，向量维度写死在 schema 里）
+createdb alea_local512
+EMBEDDING_DIM=512 DATABASE_URL=...alea_local512 alembic upgrade head
+
+# 4) 指向本地服务的 .env
+LLM_BASE_URL=http://127.0.0.1:8080/v1
+LLM_API_KEY=local
+LLM_STRUCTURED_OUTPUT_METHOD=json_mode    # 本地模型普遍不支持 tool calling
+EMBEDDING_PROVIDER=local
+EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5
+EMBEDDING_DIM=512
+```
+
+用这套配置实际观察到的结果（Qwen2.5-3B-Instruct Q4_K_M）：
+
+| 验收项 | 结果 |
+| --- | --- |
+| 动态追问 | 每轮 `understand → recall → route → explore → finalize`，追问引用用户上一句的原话 |
+| 纠正生效 | 确认项被标记为 `confirmed`；记忆出现 `merged` / `superseded` / `created`，并保留逐字 evidence |
+| RAG 真实来源 | 建议里列出 `02-method/信息充分性.md`、`01-core/底线.md`、`01-core/贪婪与恐惧.md`，标注为「本项目整理笔记」 |
+| 选祸建议 | `status: recommend`，含"必须放弃什么"、风险等级与应对、底线、重新评估条件，置信度 0.80 |
+| 跨会话记忆 | 新会话检索到上一个会话确认过的记忆（真实向量相似度 0.58–0.91） |
+| 安全兜底 | 无工具调用能力时退回确定性检索，建议依然有来源 |
+
+3B 模型本身的局限也很清楚：它偶尔会把「恐惧」写进 `greeds` 列表、
+或者对用户明确说出的纠正反应不够准确。前者已经在代码里修掉
+（按模型给出的 `kind` 标签归档，而不是按它写进了哪个列表）；
+后者是模型能力问题——生产环境应当接入更强的模型。
+
 ### 已经验证过的部分（无需密钥）
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
-| 全部后端测试 | `pytest -q` | 107 passed, 4 skipped（跳过的是 `-m llm`） |
+| 全部后端测试 | `pytest -q` | 110 passed, 4 skipped（跳过的是 `-m llm`） |
 | 静态检查 | `ruff check app tests scripts` | All checks passed |
 | 类型检查 | `mypy app` | Success: no issues found in 51 source files |
 | 前端类型 + 构建 | `npm run typecheck && npm run build` | 构建成功 |
 | 服务真实启动 | `python -m scripts.serve` | `/api/health` 返回 200，checkpointer 就绪 |
 | 缺密钥时的行为 | 未配置 `LLM_API_KEY` 时发起对话 | 503 `configuration_error`，含可执行的修复提示 |
+| 真实语义检索 | `python -m scripts.check_retrieval` | 语料 8 篇 48 切片；查询"贪婪与恐惧 错位"命中同名章节（0.79） |
 
 ---
 

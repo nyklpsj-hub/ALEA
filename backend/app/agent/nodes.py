@@ -40,7 +40,7 @@ from app.agent.prompts import (
     UNDERSTAND_USER,
 )
 from app.agent.state import AleaState
-from app.agent.tools import ToolTrace, build_knowledge_tools
+from app.agent.tools import ToolTrace, build_knowledge_tools, search_knowledge
 from app.core.config import Settings
 from app.core.logging import get_logger, redact
 from app.db.enums import AgentPhase, ConfirmationStatus, MemoryProvenance
@@ -257,15 +257,26 @@ def _reconcile(state: AleaState, result: Understanding) -> dict[str, Any]:
     #: Ids retired earlier in this session stay retired.
     retired = {*(state.get("retired_ids") or []), *(result.retired_ids or [])}
 
-    greeds = _ensure_ids([item for item in result.greeds], "g")
-    fears = _ensure_ids([item for item in result.fears], "f")
-    constraints = _ensure_ids([item for item in result.constraints], "c")
+    # `kind` is the model's explicit classification; the list it happened to
+    # write the item into is the weaker signal. Small models do put a fear in
+    # `greeds` — filing by the label keeps the fear instead of silently
+    # reclassifying it as a want.
+    motives = [*result.greeds, *result.fears]
+    greeds = [item for item in motives if item.kind == "greed"]
+    fears = [item for item in motives if item.kind != "greed"]
+    if len(greeds) != len(result.greeds):
+        logger.info(
+            "motive_list_corrected",
+            extra={"moved": abs(len(greeds) - len(result.greeds))},
+        )
+
+    greeds = _ensure_ids(greeds, "g")
+    fears = _ensure_ids(fears, "f")
+    constraints = _ensure_ids(list(result.constraints), "c")
 
     for motive in greeds:
-        motive.kind = "greed"
         _enforce_provenance(motive)
     for motive in fears:
-        motive.kind = "fear"
         _enforce_provenance(motive)
     for constraint in constraints:
         _enforce_provenance(constraint)
@@ -569,15 +580,18 @@ async def knowledge(state: AleaState) -> dict[str, Any]:
         ]
 
         closing = ""
+        closing_is_grounded = False
         for _round in range(settings.agent_max_tool_rounds):
             answer = await bound.ainvoke(messages)
             messages.append(answer)
             calls = getattr(answer, "tool_calls", None) or []
             if not calls:
-                # The model answered instead of calling another tool: that answer
-                # already has the retrieved material in context, so it *is* the
-                # summary. Making it repeat itself would be a wasted round trip.
+                # The model answered instead of calling another tool. If it had
+                # already retrieved something this round, that answer has the
+                # material in context and *is* the summary — asking it to repeat
+                # itself would be a wasted round trip.
                 closing = _text_of(answer)
+                closing_is_grounded = bool(trace.citations)
                 break
             for call in calls:
                 tool = by_name.get(call["name"])
@@ -590,7 +604,11 @@ async def knowledge(state: AleaState) -> dict[str, Any]:
                     logger.warning("tool_failed", extra={"tool": call["name"], "error": type(exc).__name__})
                 messages.append(ToolMessage(content=str(output), tool_call_id=call["id"]))
 
-        notes_text = _notes_from(closing, trace) or await _summarize_knowledge(model, messages, trace)
+        if not trace.citations:
+            await _fallback_retrieval(session=session, settings=settings, state=state, trace=trace)
+
+        grounded_closing = closing if closing_is_grounded else ""
+        notes_text = _notes_from(grounded_closing, trace) or await _summarize_knowledge(model, messages, trace)
     logger.info(
         "knowledge_done",
         extra={
@@ -605,6 +623,58 @@ async def knowledge(state: AleaState) -> dict[str, Any]:
         "phase": AgentPhase.KNOWLEDGE,
         "tool_calls": trace.calls,
     }
+
+
+async def _fallback_retrieval(
+    *,
+    session: Any,
+    settings: Settings,
+    state: AleaState,
+    trace: ToolTrace,
+) -> None:
+    """Retrieve once with a query derived from the analysis.
+
+    Some OpenAI-compatible endpoints — most local and self-hosted models — do not
+    implement tool calling at all. Without this, such a provider would silently
+    lose its theoretical grounding and produce advice with no basis, which is
+    precisely what this project must not do.
+
+    Only runs when the model retrieved nothing itself, and results are subject to
+    the same similarity floor, so an irrelevant fallback still comes back empty.
+    """
+    dilemma = state.get("dilemma", Dilemma())
+    parts = [
+        dilemma.statement,
+        *(item.description for item in state.get("contradictions", [])[:2]),
+        *(item.statement for item in state.get("fears", [])[:2]),
+        *(item.statement for item in state.get("greeds", [])[:2]),
+    ]
+    query = " ".join(part for part in parts if part).strip()
+    if not query:
+        return
+
+    logger.info(
+        "knowledge_fallback_retrieval",
+        extra={"session_id": state.get("session_id"), "reason": "模型未调用检索工具"},
+    )
+    await search_knowledge(
+        session=session,
+        settings=settings,
+        query=query,
+        top_k=settings.rag_top_k,
+        trace=trace,
+        source_types=["curated_note", "verified_excerpt"],
+        tool_name="fallback_retrieval",
+    )
+    await search_knowledge(
+        session=session,
+        settings=settings,
+        query=query,
+        top_k=2,
+        trace=trace,
+        source_types=["case"],
+        tool_name="fallback_retrieval",
+    )
 
 
 def _notes_from(text: str, trace: ToolTrace) -> list[str]:
